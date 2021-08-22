@@ -267,7 +267,7 @@ defmodule Mongo.Ecto do
   ## Indexes and Migrations
 
   Although schema migrations make no sense for databases such as MongoDB
-  there is one field where they can be very benefitial - indexes. Because of
+  there is one field where they can be very beneficial - indexes. Because of
   this Mongodb.Ecto supports Ecto's database migrations. You can generate a
   migration with:
 
@@ -360,13 +360,16 @@ defmodule Mongo.Ecto do
   @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Queryable
 
-  alias Mongo.Ecto.NormalizedQuery
-  alias Mongo.Ecto.NormalizedQuery.ReadQuery
-  alias Mongo.Ecto.NormalizedQuery.WriteQuery
-  alias Mongo.Ecto.NormalizedQuery.CountQuery
-  alias Mongo.Ecto.NormalizedQuery.AggregateQuery
   alias Mongo.Ecto.Connection
   alias Mongo.Ecto.Conversions
+  alias Mongo.Ecto.NormalizedQuery
+
+  alias Mongo.Ecto.NormalizedQuery.{
+    AggregateQuery,
+    CountQuery,
+    ReadQuery,
+    WriteQuery
+  }
 
   ## Adapter
 
@@ -470,12 +473,10 @@ defmodule Mongo.Ecto do
   defp load_binary(_), do: :error
 
   defp load_objectid(%BSON.ObjectId{} = objectid) do
-    try do
-      {:ok, BSON.ObjectId.encode!(objectid)}
-    catch
-      ArgumentError ->
-        :error
-    end
+    {:ok, BSON.ObjectId.encode!(objectid)}
+  rescue
+    ArgumentError ->
+      :error
   end
 
   defp load_objectid(_arg), do: :error
@@ -500,7 +501,7 @@ defmodule Mongo.Ecto do
     dt =
       {date, {0, 0, 0}}
       |> NaiveDateTime.from_erl!()
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, dt}
   end
@@ -517,7 +518,7 @@ defmodule Mongo.Ecto do
     datetime =
       {date, {h, m, s}}
       |> NaiveDateTime.from_erl!({ms, 6})
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, datetime}
   end
@@ -526,7 +527,7 @@ defmodule Mongo.Ecto do
     datetime =
       {date, {h, m, s}}
       |> NaiveDateTime.from_erl!({0, 6})
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, datetime}
   end
@@ -539,7 +540,7 @@ defmodule Mongo.Ecto do
     datetime =
       {date, {h, m, s}}
       |> NaiveDateTime.from_erl!({ms, 6})
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, datetime}
   end
@@ -547,7 +548,7 @@ defmodule Mongo.Ecto do
   defp dump_naive_datetime(%NaiveDateTime{} = dt) do
     datetime =
       dt
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, datetime}
   end
@@ -555,52 +556,9 @@ defmodule Mongo.Ecto do
   defp dump_naive_datetime(dt) do
     datetime =
       dt
-      |> datetime_from_naive!("Etc/UTC")
+      |> DateTime.from_naive!("Etc/UTC")
 
     {:ok, datetime}
-  end
-
-  # Copy from the Elixir 1.4.5. TODO: Replace with native methods, when we stick on ~> 1.4.
-  # Source: https://github.com/elixir-lang/elixir/blob/v1.4/lib/elixir/lib/calendar.ex#L1477
-  defp datetime_from_naive(
-         %NaiveDateTime{
-           hour: hour,
-           minute: minute,
-           second: second,
-           microsecond: microsecond,
-           year: year,
-           month: month,
-           day: day
-         },
-         "Etc/UTC"
-       ) do
-    {:ok,
-     %DateTime{
-       year: year,
-       month: month,
-       day: day,
-       hour: hour,
-       minute: minute,
-       second: second,
-       microsecond: microsecond,
-       std_offset: 0,
-       utc_offset: 0,
-       zone_abbr: "UTC",
-       time_zone: "Etc/UTC"
-     }}
-  end
-
-  # Copy from the Elixir 1.4.5. TODO: Replace with native methods, when we stick on ~> 1.4.
-  # Source: https://github.com/elixir-lang/elixir/blob/v1.4/lib/elixir/lib/calendar.ex#L1477
-  defp datetime_from_naive!(naive_datetime, time_zone) do
-    case datetime_from_naive(naive_datetime, time_zone) do
-      {:ok, datetime} ->
-        datetime
-
-      {:error, reason} ->
-        raise ArgumentError,
-              "cannot parse #{inspect(naive_datetime)} to datetime, reason: #{inspect(reason)}"
-    end
   end
 
   defp dump_binary(binary, subtype) when is_binary(binary),
@@ -609,12 +567,9 @@ defmodule Mongo.Ecto do
   defp dump_binary(_, _), do: :error
 
   defp dump_objectid(<<objectid::binary-size(24)>>) do
-    try do
-      {:ok, BSON.ObjectId.decode!(objectid)}
-    catch
-      ArgumentError ->
-        :error
-    end
+    {:ok, BSON.ObjectId.decode!(objectid)}
+  rescue
+    ArgumentError -> :error
   end
 
   defp dump_objectid(_), do: :error
@@ -706,9 +661,7 @@ defmodule Mongo.Ecto do
   def insert(_repo, meta, _params, _on_conflict, [_ | _] = returning, _opts) do
     raise ArgumentError,
           "MongoDB adapter does not support :read_after_writes in models. " <>
-            "The following fields in #{inspect(meta.schema)} are tagged as such: #{
-              inspect(returning)
-            }"
+            "The following fields in #{inspect(meta.schema)} are tagged as such: #{inspect(returning)}"
   end
 
   def insert(repo, meta, params, _, [], opts) do
@@ -724,6 +677,16 @@ defmodule Mongo.Ecto do
   end
 
   @impl true
+  @spec insert_all(
+          %{:opts => any, :pid => any, :telemetry => any, optional(any) => any},
+          %{:prefix => any, :schema => atom, :source => any, optional(any) => any},
+          any,
+          any,
+          any,
+          any,
+          any,
+          list
+        ) :: {:invalid | non_neg_integer, nil | [{:unique, binary}, ...]}
   def insert_all(repo, meta, _fields, params, _on_conflict, _returning, _placeholders, opts) do
     normalized = NormalizedQuery.insert(meta, params)
 
@@ -896,5 +859,52 @@ defmodule Mongo.Ecto do
 
   defp db_version(repo) do
     command(repo, %{buildinfo: 1}, [])["versionArray"]
+  end
+
+  @doc """
+  Lists indexes in the specified `repo` and `collection`.
+  """
+  def list_indexes(repo, collection, opts \\ []) do
+    Ecto.Adapter.lookup_meta(repo)
+    |> Connection.query(:list_indexes, [collection], opts)
+    |> Enum.to_list()
+  end
+
+  def list_index_names(repo, collection, opts \\ []) do
+    Ecto.Adapter.lookup_meta(repo)
+    |> Connection.query(:list_index_names, [collection], opts)
+    |> Enum.to_list()
+  end
+
+  def index(repo, collection, index_name, opts \\ []) do
+    list_indexes(repo, collection, opts)
+    |> Enum.find(fn index -> index["name"] == index_name end)
+  end
+
+  @doc """
+  Creates one or more `indexes` for the specified collection `coll`.
+
+  See
+  https://docs.mongodb.com/manual/reference/method/db.collection.createIndexes/#mongodb-method-db.collection.createIndexes
+  for the syntax of `indexes`.
+  """
+  def create_indexes(repo, collection, indexes, opts \\ []) do
+    Ecto.Adapter.lookup_meta(repo)
+    |> Connection.query(:create_indexes, [collection, indexes], opts)
+  end
+
+  @doc """
+  Drops the specified `indexes` in the collection `coll`.
+
+  To drop a single index, pass the name of the index.
+
+  To drop multiple indexes at once pass a list of indexes to `index`.  To drop all indexes except
+  that of `_id` pass "*" to `index`.
+
+  See https://docs.mongodb.com/manual/reference/command/dropIndexes/#dropindexes
+  """
+  def drop_indexes(repo, collection, indexes, opts \\ []) do
+    Ecto.Adapter.lookup_meta(repo)
+    |> Connection.query(:drop_index, [collection, indexes], opts)
   end
 end

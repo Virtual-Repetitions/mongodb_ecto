@@ -39,8 +39,8 @@ defmodule Mongo.Ecto.NormalizedQuery do
     defstruct coll: nil, pk: nil, fields: [], pipeline: [], database: nil, opts: []
   end
 
-  alias Mongo.Ecto.Conversions
   alias Ecto.Query
+  alias Mongo.Ecto.Conversions
 
   defmacrop is_op(op) do
     quote do
@@ -229,6 +229,15 @@ defmodule Mongo.Ecto.NormalizedQuery do
        ) do
     pacc = Enum.into(fields, pacc, &{field(&1, pk), true})
     facc = [field | facc]
+
+    projection(rest, params, from, query, pacc, facc)
+  end
+
+  defp projection([%Ecto.Query.Tagged{value: value} | rest], params, from, query, pacc, facc) do
+    {_, model, pk} = from
+
+    pacc = Enum.into(model.__schema__(:fields), pacc, &{field(&1, pk), true})
+    facc = [{:field, pk, value} | facc]
 
     projection(rest, params, from, query, pacc, facc)
   end
