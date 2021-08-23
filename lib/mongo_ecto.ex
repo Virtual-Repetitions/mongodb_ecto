@@ -657,14 +657,19 @@ defmodule Mongo.Ecto do
 
   defp get_struct_from_query(_), do: nil
 
-  @impl true
-  def insert(_repo, meta, _params, _on_conflict, [_ | _] = returning, _opts) do
-    raise ArgumentError,
-          "MongoDB adapter does not support :read_after_writes in models. " <>
-            "The following fields in #{inspect(meta.schema)} are tagged as such: #{inspect(returning)}"
-  end
+  # @impl true
+  # def insert(_repo, meta, _params, _on_conflict, [_ | _] = returning, _opts) do
+  #   require IEx
+  #   IEx.pry()
 
-  def insert(repo, meta, params, _, [], opts) do
+  #   raise ArgumentError,
+  #         "MongoDB adapter does not support :read_after_writes in models. " <>
+  #           "The following fields in #{inspect(meta.schema)} are tagged as such: #{
+  #             inspect(returning)
+  #           }"
+  # end
+
+  def insert(repo, meta, params, _, _returning_fields, opts) do
     normalized = NormalizedQuery.insert(meta, params)
 
     case Connection.insert(repo, normalized, opts) do
@@ -735,9 +740,14 @@ defmodule Mongo.Ecto do
   end
 
   # TODO Not sure how to do this or if it's useful for Mongo
+  # see https://hexdocs.pm/ecto/Ecto.Adapter.html#c:checkout/3
   @impl true
-  def checkout(_, _, fun) do
+  def checkout(_adapter_meta, _config, fun) do
     fun.()
+  end
+
+  def checked_out?(%{pid: pid} = _adapter_meta) do
+    Process.alive?(pid)
   end
 
   ## Storage
