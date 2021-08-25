@@ -770,7 +770,6 @@ defmodule Ecto.Integration.AssocTest do
     assert perma.post_id == nil
   end
 
-  # TODO Fails
   @tag :on_replace_update
   test "belongs_to changeset assoc (on_replace: :update)" do
     # Insert new

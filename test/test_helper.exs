@@ -31,7 +31,6 @@ ExUnit.start(
     :placeholders,
     :preload,
     :on_replace_delete_if_exists,
-    :on_replace_update,
     :sub_query,
     :tagged_types,
     :union_with_literals,
